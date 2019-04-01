@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -23,7 +23,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.restdocs.mockmvc.MockMvcRestDocumentation;
-import org.springframework.restdocs.payload.JsonFieldType;
 
 import static org.springframework.restdocs.operation.preprocess.Preprocessors.preprocessResponse;
 import static org.springframework.restdocs.payload.PayloadDocumentation.fieldWithPath;
@@ -39,30 +38,28 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * @author Andy Wilkinson
  */
 public class ConfigurationPropertiesReportEndpointDocumentationTests
-		extends AbstractEndpointDocumentationTests {
+		extends MockMvcEndpointDocumentationTests {
 
 	@Test
 	public void configProps() throws Exception {
 		this.mockMvc.perform(get("/actuator/configprops")).andExpect(status().isOk())
 				.andDo(MockMvcRestDocumentation.document("configprops",
-						preprocessResponse(limit("beans")),
+						preprocessResponse(limit("contexts",
+								getApplicationContext().getId(), "beans")),
 						responseFields(
-								fieldWithPath("contextId")
-										.description("ID of the application context."),
-								fieldWithPath("beans.*").description(
+								fieldWithPath("contexts")
+										.description("Application contexts keyed by id."),
+								fieldWithPath("contexts.*.beans.*").description(
 										"`@ConfigurationProperties` beans keyed by bean name."),
-								fieldWithPath("beans.*.prefix").description(
+								fieldWithPath("contexts.*.beans.*.prefix").description(
 										"Prefix applied to the names of the bean's properties."),
-								subsectionWithPath("beans.*.properties").description(
-										"Properties of the bean as name-value pairs."),
-								subsectionWithPath("parent")
+								subsectionWithPath("contexts.*.beans.*.properties")
 										.description(
-												"`@ConfigurationProperties` beans in the parent "
-														+ "context, if any.")
-										.optional().type(JsonFieldType.OBJECT))));
+												"Properties of the bean as name-value pairs."),
+								parentIdField())));
 	}
 
-	@Configuration
+	@Configuration(proxyBeanMethods = false)
 	@Import(BaseDocumentationConfiguration.class)
 	static class TestConfiguration {
 

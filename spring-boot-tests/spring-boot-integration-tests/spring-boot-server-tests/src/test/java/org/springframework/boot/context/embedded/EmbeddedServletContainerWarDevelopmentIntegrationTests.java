@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -50,22 +50,21 @@ public class EmbeddedServletContainerWarDevelopmentIntegrationTests
 	}
 
 	@Test
-	public void metaInfResourceFromDependencyIsAvailableViaHttp() throws Exception {
+	public void metaInfResourceFromDependencyIsAvailableViaHttp() {
 		ResponseEntity<String> entity = this.rest
 				.getForEntity("/nested-meta-inf-resource.txt", String.class);
 		assertThat(entity.getStatusCode()).isEqualTo(HttpStatus.OK);
 	}
 
 	@Test
-	public void metaInfResourceFromDependencyIsAvailableViaServletContext()
-			throws Exception {
+	public void metaInfResourceFromDependencyIsAvailableViaServletContext() {
 		ResponseEntity<String> entity = this.rest.getForEntity(
 				"/servletContext?/nested-meta-inf-resource.txt", String.class);
 		assertThat(entity.getStatusCode()).isEqualTo(HttpStatus.OK);
 	}
 
 	@Test
-	public void webappResourcesAreAvailableViaHttp() throws Exception {
+	public void webappResourcesAreAvailableViaHttp() {
 		ResponseEntity<String> entity = this.rest.getForEntity("/webapp-resource.txt",
 				String.class);
 		assertThat(entity.getStatusCode()).isEqualTo(HttpStatus.OK);

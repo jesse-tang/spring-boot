@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -20,8 +20,8 @@ import javax.sql.DataSource;
 
 import org.junit.Test;
 
+import org.springframework.boot.actuate.context.properties.ConfigurationPropertiesReportEndpoint.ApplicationConfigurationProperties;
 import org.springframework.boot.actuate.context.properties.ConfigurationPropertiesReportEndpoint.ConfigurationPropertiesBeanDescriptor;
-import org.springframework.boot.actuate.context.properties.ConfigurationPropertiesReportEndpoint.ConfigurationPropertiesDescriptor;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
@@ -52,16 +52,17 @@ public class ConfigurationPropertiesReportEndpointProxyTests {
 		ApplicationContextRunner contextRunner = new ApplicationContextRunner()
 				.withUserConfiguration(Config.class, SqlExecutor.class);
 		contextRunner.run((context) -> {
-			ConfigurationPropertiesDescriptor report = context
+			ApplicationConfigurationProperties applicationProperties = context
 					.getBean(ConfigurationPropertiesReportEndpoint.class)
 					.configurationProperties();
-			assertThat(report.getBeans().values().stream()
+			assertThat(applicationProperties.getContexts().get(context.getId()).getBeans()
+					.values().stream()
 					.map(ConfigurationPropertiesBeanDescriptor::getPrefix)
 					.filter("executor.sql"::equals).findFirst()).isNotEmpty();
 		});
 	}
 
-	@Configuration
+	@Configuration(proxyBeanMethods = false)
 	@EnableTransactionManagement(proxyTargetClass = false)
 	@EnableConfigurationProperties
 	public static class Config {
@@ -72,8 +73,8 @@ public class ConfigurationPropertiesReportEndpointProxyTests {
 		}
 
 		@Bean
-		public PlatformTransactionManager transactionManager() {
-			return new DataSourceTransactionManager(dataSource());
+		public PlatformTransactionManager transactionManager(DataSource dataSource) {
+			return new DataSourceTransactionManager(dataSource);
 		}
 
 		@Bean
@@ -90,7 +91,7 @@ public class ConfigurationPropertiesReportEndpointProxyTests {
 
 	}
 
-	public static abstract class AbstractExecutor implements Executor {
+	public abstract static class AbstractExecutor implements Executor {
 
 	}
 

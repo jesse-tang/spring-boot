@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -39,13 +39,14 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.context.WebApplicationContext;
 import org.springframework.web.servlet.config.annotation.EnableWebMvc;
-import org.springframework.web.servlet.handler.HandlerMappingIntrospector;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
+ * Test for {@link WebMvcMetricsFilter} with auto-timed enabled.
+ *
  * @author Jon Schneider
  */
 @RunWith(SpringRunner.class)
@@ -54,9 +55,6 @@ public class WebMvcMetricsFilterAutoTimedTests {
 
 	@Autowired
 	private MeterRegistry registry;
-
-	@Autowired
-	private MockClock clock;
 
 	@Autowired
 	private WebApplicationContext context;
@@ -75,14 +73,11 @@ public class WebMvcMetricsFilterAutoTimedTests {
 	@Test
 	public void metricsCanBeAutoTimed() throws Exception {
 		this.mvc.perform(get("/api/10")).andExpect(status().isOk());
-
-		this.clock.add(SimpleConfig.DEFAULT_STEP);
-		assertThat(
-				this.registry.find("http.server.requests").tags("status", "200").timer())
-						.hasValueSatisfying((t) -> assertThat(t.count()).isEqualTo(1));
+		assertThat(this.registry.get("http.server.requests").tags("status", "200").timer()
+				.count()).isEqualTo(1L);
 	}
 
-	@Configuration
+	@Configuration(proxyBeanMethods = false)
 	@EnableWebMvc
 	@Import({ Controller.class })
 	static class TestConfiguration {
@@ -98,15 +93,10 @@ public class WebMvcMetricsFilterAutoTimedTests {
 		}
 
 		@Bean
-		public WebMvcMetrics controllerMetrics(MeterRegistry registry) {
-			return new WebMvcMetrics(registry, new DefaultWebMvcTagsProvider(),
-					"http.server.requests", true, false);
-		}
-
-		@Bean
-		public WebMvcMetricsFilter webMetricsFilter(WebMvcMetrics controllerMetrics,
-				HandlerMappingIntrospector introspector) {
-			return new WebMvcMetricsFilter(controllerMetrics, introspector);
+		public WebMvcMetricsFilter webMetricsFilter(WebApplicationContext context,
+				MeterRegistry registry) {
+			return new WebMvcMetricsFilter(registry, new DefaultWebMvcTagsProvider(),
+					"http.server.requests", true);
 		}
 
 	}

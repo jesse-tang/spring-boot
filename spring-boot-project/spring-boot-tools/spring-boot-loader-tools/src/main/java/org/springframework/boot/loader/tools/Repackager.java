@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,9 +21,10 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Set;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.concurrent.TimeUnit;
 import java.util.jar.JarFile;
 import java.util.jar.Manifest;
@@ -31,6 +32,7 @@ import java.util.jar.Manifest;
 import org.apache.commons.compress.archivers.jar.JarArchiveEntry;
 
 import org.springframework.boot.loader.tools.JarWriter.EntryTransformer;
+import org.springframework.boot.loader.tools.JarWriter.UnpackHandler;
 import org.springframework.core.io.support.SpringFactoriesLoader;
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
@@ -177,11 +179,11 @@ public class Repackager {
 		if (this.layout == null) {
 			this.layout = getLayoutFactory().getLayout(this.source);
 		}
-		if (alreadyRepackaged()) {
-			return;
-		}
 		destination = destination.getAbsoluteFile();
 		File workingSource = this.source;
+		if (alreadyRepackaged() && this.source.equals(destination)) {
+			return;
+		}
 		if (this.source.equals(destination)) {
 			workingSource = getBackupFile();
 			workingSource.delete();
@@ -231,53 +233,19 @@ public class Repackager {
 
 	private void repackage(JarFile sourceJar, File destination, Libraries libraries,
 			LaunchScript launchScript) throws IOException {
+		WritableLibraries writeableLibraries = new WritableLibraries(libraries);
 		try (JarWriter writer = new JarWriter(destination, launchScript)) {
-			final List<Library> unpackLibraries = new ArrayList<>();
-			final List<Library> standardLibraries = new ArrayList<>();
-			libraries.doWithLibraries((library) -> {
-				File file = library.getFile();
-				if (isZip(file)) {
-					if (library.isUnpackRequired()) {
-						unpackLibraries.add(library);
-					}
-					else {
-						standardLibraries.add(library);
-					}
-				}
-			});
-			repackage(sourceJar, writer, unpackLibraries, standardLibraries);
-		}
-	}
-
-	private void repackage(JarFile sourceJar, JarWriter writer,
-			final List<Library> unpackLibraries, final List<Library> standardLibraries)
-					throws IOException {
-		writer.writeManifest(buildManifest(sourceJar));
-		Set<String> seen = new HashSet<>();
-		writeNestedLibraries(unpackLibraries, seen, writer);
-		if (this.layout instanceof RepackagingLayout) {
-			writer.writeEntries(sourceJar, new RenamingEntryTransformer(
-					((RepackagingLayout) this.layout).getRepackagedClassesLocation()));
-		}
-		else {
-			writer.writeEntries(sourceJar);
-		}
-		writeNestedLibraries(standardLibraries, seen, writer);
-		writeLoaderClasses(writer);
-	}
-
-	private void writeNestedLibraries(List<Library> libraries, Set<String> alreadySeen,
-			JarWriter writer) throws IOException {
-		for (Library library : libraries) {
-			String destination = Repackager.this.layout
-					.getLibraryDestination(library.getName(), library.getScope());
-			if (destination != null) {
-				if (!alreadySeen.add(destination + library.getName())) {
-					throw new IllegalStateException(
-							"Duplicate library " + library.getName());
-				}
-				writer.writeNestedLibrary(destination, library);
+			writer.writeManifest(buildManifest(sourceJar));
+			writeLoaderClasses(writer);
+			if (this.layout instanceof RepackagingLayout) {
+				writer.writeEntries(sourceJar, new RenamingEntryTransformer(
+						((RepackagingLayout) this.layout).getRepackagedClassesLocation()),
+						writeableLibraries);
 			}
+			else {
+				writer.writeEntries(sourceJar, writeableLibraries);
+			}
+			writeableLibraries.write(writer);
 		}
 	}
 
@@ -302,8 +270,8 @@ public class Repackager {
 	}
 
 	private boolean isZip(InputStream inputStream) throws IOException {
-		for (int i = 0; i < ZIP_FILE_HEADER.length; i++) {
-			if (inputStream.read() != ZIP_FILE_HEADER[i]) {
+		for (byte magicByte : ZIP_FILE_HEADER) {
+			if (inputStream.read() != magicByte) {
 				return false;
 			}
 		}
@@ -412,8 +380,10 @@ public class Repackager {
 				return null;
 			}
 			if ((entry.getName().startsWith("META-INF/")
-					&& !entry.getName().equals("META-INF/aop.xml"))
-					|| entry.getName().startsWith("BOOT-INF/")) {
+					&& !entry.getName().equals("META-INF/aop.xml")
+					&& !entry.getName().endsWith(".kotlin_module"))
+					|| entry.getName().startsWith("BOOT-INF/")
+					|| entry.getName().equals("module-info.class")) {
 				return entry;
 			}
 			JarArchiveEntry renamedEntry = new JarArchiveEntry(
@@ -439,6 +409,57 @@ public class Repackager {
 				renamedEntry.setLastModifiedTime(entry.getLastModifiedTime());
 			}
 			return renamedEntry;
+		}
+
+	}
+
+	/**
+	 * An {@link UnpackHandler} that determines that an entry needs to be unpacked if a
+	 * library that requires unpacking has a matching entry name.
+	 */
+	private final class WritableLibraries implements UnpackHandler {
+
+		private final Map<String, Library> libraryEntryNames = new LinkedHashMap<>();
+
+		private WritableLibraries(Libraries libraries) throws IOException {
+			libraries.doWithLibraries((library) -> {
+				if (isZip(library.getFile())) {
+					String libraryDestination = Repackager.this.layout
+							.getLibraryDestination(library.getName(), library.getScope());
+					if (libraryDestination != null) {
+						Library existing = this.libraryEntryNames.putIfAbsent(
+								libraryDestination + library.getName(), library);
+						if (existing != null) {
+							throw new IllegalStateException(
+									"Duplicate library " + library.getName());
+						}
+					}
+				}
+			});
+		}
+
+		@Override
+		public boolean requiresUnpack(String name) {
+			Library library = this.libraryEntryNames.get(name);
+			return library != null && library.isUnpackRequired();
+		}
+
+		@Override
+		public String sha1Hash(String name) throws IOException {
+			Library library = this.libraryEntryNames.get(name);
+			if (library == null) {
+				throw new IllegalArgumentException(
+						"No library found for entry name '" + name + "'");
+			}
+			return FileUtils.sha1Hash(library.getFile());
+		}
+
+		private void write(JarWriter writer) throws IOException {
+			for (Entry<String, Library> entry : this.libraryEntryNames.entrySet()) {
+				writer.writeNestedLibrary(
+						entry.getKey().substring(0, entry.getKey().lastIndexOf('/') + 1),
+						entry.getValue());
+			}
 		}
 
 	}

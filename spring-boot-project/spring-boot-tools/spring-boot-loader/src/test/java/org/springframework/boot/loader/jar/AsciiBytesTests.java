@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2018 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,11 +16,10 @@
 
 package org.springframework.boot.loader.jar;
 
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.ExpectedException;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatExceptionOfType;
 
 /**
  * Tests for {@link AsciiBytes}.
@@ -30,8 +29,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 public class AsciiBytesTests {
 
-	@Rule
-	public ExpectedException thrown = ExpectedException.none();
+	private static final char NO_SUFFIX = 0;
 
 	@Test
 	public void createFromBytes() {
@@ -91,8 +89,8 @@ public class AsciiBytesTests {
 		assertThat(abcd.substring(2).toString()).isEqualTo("CD");
 		assertThat(abcd.substring(3).toString()).isEqualTo("D");
 		assertThat(abcd.substring(4).toString()).isEqualTo("");
-		this.thrown.expect(IndexOutOfBoundsException.class);
-		abcd.substring(5);
+		assertThatExceptionOfType(IndexOutOfBoundsException.class)
+				.isThrownBy(() -> abcd.substring(5));
 	}
 
 	@Test
@@ -102,24 +100,8 @@ public class AsciiBytesTests {
 		assertThat(abcd.substring(1, 3).toString()).isEqualTo("BC");
 		assertThat(abcd.substring(3, 4).toString()).isEqualTo("D");
 		assertThat(abcd.substring(3, 3).toString()).isEqualTo("");
-		this.thrown.expect(IndexOutOfBoundsException.class);
-		abcd.substring(3, 5);
-	}
-
-	@Test
-	public void appendString() {
-		AsciiBytes bc = new AsciiBytes(new byte[] { 65, 66, 67, 68 }, 1, 2);
-		AsciiBytes appended = bc.append("D");
-		assertThat(bc.toString()).isEqualTo("BC");
-		assertThat(appended.toString()).isEqualTo("BCD");
-	}
-
-	@Test
-	public void appendBytes() {
-		AsciiBytes bc = new AsciiBytes(new byte[] { 65, 66, 67, 68 }, 1, 2);
-		AsciiBytes appended = bc.append(new byte[] { 68 });
-		assertThat(bc.toString()).isEqualTo("BC");
-		assertThat(appended.toString()).isEqualTo("BCD");
+		assertThatExceptionOfType(IndexOutOfBoundsException.class)
+				.isThrownBy(() -> abcd.substring(3, 5));
 	}
 
 	@Test
@@ -161,6 +143,57 @@ public class AsciiBytesTests {
 
 	private void hashCodeSameAsString(String input) {
 		assertThat(new AsciiBytes(input).hashCode()).isEqualTo(input.hashCode());
+	}
+
+	@Test
+	public void matchesSameAsString() {
+		matchesSameAsString("abcABC123xyz!");
+	}
+
+	@Test
+	public void matchesSameAsStringWithSpecial() {
+		matchesSameAsString("special/\u00EB.dat");
+	}
+
+	@Test
+	public void matchesSameAsStringWithCyrillicCharacters() {
+		matchesSameAsString("\u0432\u0435\u0441\u043D\u0430");
+	}
+
+	@Test
+	public void matchesDifferentLengths() {
+		assertThat(new AsciiBytes("abc").matches("ab", NO_SUFFIX)).isFalse();
+		assertThat(new AsciiBytes("abc").matches("abcd", NO_SUFFIX)).isFalse();
+		assertThat(new AsciiBytes("abc").matches("abc", NO_SUFFIX)).isTrue();
+		assertThat(new AsciiBytes("abc").matches("a", 'b')).isFalse();
+		assertThat(new AsciiBytes("abc").matches("abc", 'd')).isFalse();
+		assertThat(new AsciiBytes("abc").matches("ab", 'c')).isTrue();
+	}
+
+	@Test
+	public void matchesSuffix() {
+		assertThat(new AsciiBytes("ab").matches("a", 'b')).isTrue();
+	}
+
+	@Test
+	public void matchesSameAsStringWithEmoji() {
+		matchesSameAsString("\ud83d\udca9");
+	}
+
+	@Test
+	public void hashCodeFromInstanceMatchesHashCodeFromString() {
+		String name = "fonts/宋体/simsun.ttf";
+		assertThat(new AsciiBytes(name).hashCode()).isEqualTo(AsciiBytes.hashCode(name));
+	}
+
+	@Test
+	public void instanceCreatedFromCharSequenceMatchesSameCharSequence() {
+		String name = "fonts/宋体/simsun.ttf";
+		assertThat(new AsciiBytes(name).matches(name, NO_SUFFIX)).isTrue();
+	}
+
+	private void matchesSameAsString(String input) {
+		assertThat(new AsciiBytes(input).matches(input, NO_SUFFIX)).isTrue();
 	}
 
 }

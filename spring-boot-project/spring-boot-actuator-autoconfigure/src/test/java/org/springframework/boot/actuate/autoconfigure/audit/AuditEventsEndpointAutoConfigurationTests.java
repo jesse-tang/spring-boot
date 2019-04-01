@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,8 +19,6 @@ package org.springframework.boot.actuate.autoconfigure.audit;
 import org.junit.Test;
 
 import org.springframework.boot.actuate.audit.AuditEventsEndpoint;
-import org.springframework.boot.actuate.audit.AuditEventsEndpointWebExtension;
-import org.springframework.boot.actuate.audit.AuditEventsJmxEndpointExtension;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
@@ -41,30 +39,26 @@ public class AuditEventsEndpointAutoConfigurationTests {
 
 	@Test
 	public void runShouldHaveEndpointBean() {
-		this.contextRunner.run((context) -> assertThat(context)
-				.hasSingleBean(AuditEventsEndpoint.class));
+		this.contextRunner
+				.withPropertyValues(
+						"management.endpoints.web.exposure.include=auditevents")
+				.run((context) -> assertThat(context)
+						.hasSingleBean(AuditEventsEndpoint.class));
 	}
 
 	@Test
-	public void runShouldHaveJmxExtensionBean() {
+	public void runWhenNotExposedShouldNotHaveEndpointBean() {
 		this.contextRunner.run((context) -> assertThat(context)
-				.hasSingleBean(AuditEventsJmxEndpointExtension.class));
+				.doesNotHaveBean(AuditEventsEndpoint.class));
 	}
 
 	@Test
-	public void runShouldHaveWebExtensionBean() {
-		this.contextRunner.run((context) -> assertThat(context)
-				.hasSingleBean(AuditEventsEndpointWebExtension.class));
-	}
-
-	@Test
-	public void runWhenEnabledPropertyIsFalseShouldNotHaveEndpointOrExtensionBean() {
+	public void runWhenEnabledPropertyIsFalseShouldNotHaveEndpoint() {
 		this.contextRunner
 				.withPropertyValues("management.endpoint.auditevents.enabled:false")
+				.withPropertyValues("management.endpoints.web.exposure.include=*")
 				.run((context) -> assertThat(context)
-						.doesNotHaveBean(AuditEventsEndpoint.class)
-						.doesNotHaveBean(AuditEventsJmxEndpointExtension.class)
-						.doesNotHaveBean(AuditEventsEndpointWebExtension.class));
+						.doesNotHaveBean(AuditEventsEndpoint.class));
 	}
 
 }

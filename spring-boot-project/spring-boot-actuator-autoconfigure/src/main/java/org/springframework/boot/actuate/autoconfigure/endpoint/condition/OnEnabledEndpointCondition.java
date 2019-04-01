@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,19 +16,16 @@
 
 package org.springframework.boot.actuate.autoconfigure.endpoint.condition;
 
-import org.springframework.boot.actuate.endpoint.annotation.Endpoint;
-import org.springframework.boot.actuate.endpoint.annotation.EndpointExtension;
+import java.util.Optional;
+
+import org.springframework.boot.actuate.endpoint.EndpointId;
 import org.springframework.boot.autoconfigure.condition.ConditionMessage;
 import org.springframework.boot.autoconfigure.condition.ConditionOutcome;
-import org.springframework.boot.autoconfigure.condition.SpringBootCondition;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.ConditionContext;
-import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.core.annotation.AnnotationAttributes;
+import org.springframework.core.env.Environment;
 import org.springframework.core.type.AnnotatedTypeMetadata;
-import org.springframework.core.type.MethodMetadata;
-import org.springframework.util.Assert;
-import org.springframework.util.ClassUtils;
+import org.springframework.util.ConcurrentReferenceHashMap;
 
 /**
  * A condition that checks if an endpoint is enabled.
@@ -38,26 +35,28 @@ import org.springframework.util.ClassUtils;
  * @author Phillip Webb
  * @see ConditionalOnEnabledEndpoint
  */
-class OnEnabledEndpointCondition extends SpringBootCondition {
+class OnEnabledEndpointCondition extends AbstractEndpointCondition {
 
 	private static final String ENABLED_BY_DEFAULT_KEY = "management.endpoints.enabled-by-default";
+
+	private static final ConcurrentReferenceHashMap<Environment, Optional<Boolean>> enabledByDefaultCache = new ConcurrentReferenceHashMap<>();
 
 	@Override
 	public ConditionOutcome getMatchOutcome(ConditionContext context,
 			AnnotatedTypeMetadata metadata) {
-		AnnotationAttributes attributes = getEndpointAttributes(context, metadata);
-		String id = attributes.getString("id");
-		String key = "management.endpoint." + id + ".enabled";
-		Boolean userDefinedEnabled = context.getEnvironment().getProperty(key,
-				Boolean.class);
+		Environment environment = context.getEnvironment();
+		AnnotationAttributes attributes = getEndpointAttributes(
+				ConditionalOnEnabledEndpoint.class, context, metadata);
+		EndpointId id = EndpointId.of(attributes.getString("id"));
+		String key = "management.endpoint." + id.toLowerCaseString() + ".enabled";
+		Boolean userDefinedEnabled = environment.getProperty(key, Boolean.class);
 		if (userDefinedEnabled != null) {
 			return new ConditionOutcome(userDefinedEnabled,
 					ConditionMessage.forCondition(ConditionalOnEnabledEndpoint.class)
 							.because("found property " + key + " with value "
 									+ userDefinedEnabled));
 		}
-		Boolean userDefinedDefault = context.getEnvironment()
-				.getProperty(ENABLED_BY_DEFAULT_KEY, Boolean.class);
+		Boolean userDefinedDefault = isEnabledByDefault(environment);
 		if (userDefinedDefault != null) {
 			return new ConditionOutcome(userDefinedDefault,
 					ConditionMessage.forCondition(ConditionalOnEnabledEndpoint.class)
@@ -71,44 +70,14 @@ class OnEnabledEndpointCondition extends SpringBootCondition {
 						"no property " + key + " found so using endpoint default"));
 	}
 
-	private AnnotationAttributes getEndpointAttributes(ConditionContext context,
-			AnnotatedTypeMetadata metadata) {
-		Assert.state(
-				metadata instanceof MethodMetadata
-						&& metadata.isAnnotated(Bean.class.getName()),
-				"OnEnabledEndpointCondition may only be used on @Bean methods");
-		return getEndpointAttributes(context, (MethodMetadata) metadata);
-	}
-
-	private AnnotationAttributes getEndpointAttributes(ConditionContext context,
-			MethodMetadata metadata) {
-		// We should be safe to load at this point since we are in the REGISTER_BEAN phase
-		try {
-			Class<?> returnType = ClassUtils.forName(metadata.getReturnTypeName(),
-					context.getClassLoader());
-			return getEndpointAttributes(returnType);
+	private Boolean isEnabledByDefault(Environment environment) {
+		Optional<Boolean> enabledByDefault = enabledByDefaultCache.get(environment);
+		if (enabledByDefault == null) {
+			enabledByDefault = Optional.ofNullable(
+					environment.getProperty(ENABLED_BY_DEFAULT_KEY, Boolean.class));
+			enabledByDefaultCache.put(environment, enabledByDefault);
 		}
-		catch (Throwable ex) {
-			throw new IllegalStateException("Failed to extract endpoint id for "
-					+ metadata.getDeclaringClassName() + "." + metadata.getMethodName(),
-					ex);
-		}
-	}
-
-	protected AnnotationAttributes getEndpointAttributes(Class<?> type) {
-		AnnotationAttributes attributes = AnnotatedElementUtils
-				.findMergedAnnotationAttributes(type, Endpoint.class, true, true);
-		if (attributes == null) {
-			attributes = AnnotatedElementUtils.findMergedAnnotationAttributes(type,
-					EndpointExtension.class, false, true);
-			if (attributes != null) {
-				return getEndpointAttributes(attributes.getClass("endpoint"));
-			}
-		}
-		Assert.state(attributes != null,
-				"OnEnabledEndpointCondition may only be used on @Bean methods that "
-						+ "return an @Endpoint or and @EndpointExtension");
-		return attributes;
+		return enabledByDefault.orElse(null);
 	}
 
 }

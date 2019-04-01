@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -21,7 +21,7 @@ import java.util.Map;
 import org.junit.Test;
 
 import org.springframework.boot.actuate.context.properties.ConfigurationPropertiesReportEndpoint;
-import org.springframework.boot.actuate.context.properties.ConfigurationPropertiesReportEndpoint.ConfigurationPropertiesDescriptor;
+import org.springframework.boot.actuate.context.properties.ConfigurationPropertiesReportEndpoint.ApplicationConfigurationProperties;
 import org.springframework.boot.autoconfigure.AutoConfigurations;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -47,6 +47,8 @@ public class ConfigurationPropertiesReportEndpointAutoConfigurationTests {
 	@Test
 	public void runShouldHaveEndpointBean() {
 		this.contextRunner.withUserConfiguration(Config.class)
+				.withPropertyValues(
+						"management.endpoints.web.exposure.include=configprops")
 				.run(validateTestProperties("******", "654321"));
 	}
 
@@ -60,10 +62,17 @@ public class ConfigurationPropertiesReportEndpointAutoConfigurationTests {
 
 	@Test
 	public void keysToSanitizeCanBeConfiguredViaTheEnvironment() {
-		this.contextRunner.withUserConfiguration(Config.class)
+		this.contextRunner.withUserConfiguration(Config.class).withPropertyValues(
+				"management.endpoint.configprops.keys-to-sanitize: .*pass.*, property")
 				.withPropertyValues(
-						"management.endpoint.configprops.keys-to-sanitize: .*pass.*, property")
+						"management.endpoints.web.exposure.include=configprops")
 				.run(validateTestProperties("******", "******"));
+	}
+
+	@Test
+	public void runWhenNotExposedShouldNotHaveEndpointBean() {
+		this.contextRunner.run((context) -> assertThat(context)
+				.doesNotHaveBean(ConfigurationPropertiesReportEndpoint.class));
 	}
 
 	private ContextConsumer<AssertableApplicationContext> validateTestProperties(
@@ -73,17 +82,18 @@ public class ConfigurationPropertiesReportEndpointAutoConfigurationTests {
 					.hasSingleBean(ConfigurationPropertiesReportEndpoint.class);
 			ConfigurationPropertiesReportEndpoint endpoint = context
 					.getBean(ConfigurationPropertiesReportEndpoint.class);
-			ConfigurationPropertiesDescriptor properties = endpoint
+			ApplicationConfigurationProperties properties = endpoint
 					.configurationProperties();
-			Map<String, Object> nestedProperties = properties.getBeans()
-					.get("testProperties").getProperties();
+			Map<String, Object> nestedProperties = properties.getContexts()
+					.get(context.getId()).getBeans().get("testProperties")
+					.getProperties();
 			assertThat(nestedProperties).isNotNull();
 			assertThat(nestedProperties.get("dbPassword")).isEqualTo(dbPassword);
 			assertThat(nestedProperties.get("myTestProperty")).isEqualTo(myTestProperty);
 		};
 	}
 
-	@Configuration
+	@Configuration(proxyBeanMethods = false)
 	@EnableConfigurationProperties
 	public static class Config {
 

@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,10 +17,7 @@
 package org.springframework.boot.context.properties.source;
 
 import java.util.Collections;
-import java.util.List;
-import java.util.function.Function;
 
-import org.springframework.core.env.PropertySource;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 
@@ -47,22 +44,17 @@ class TestPropertyMapper implements PropertyMapper {
 		}
 	}
 
-	public void addFromConfigurationProperty(ConfigurationPropertyName from, String to,
-			Function<Object, Object> extractor) {
-		this.fromConfig.add(from, new PropertyMapping(to, from, extractor));
+	@Override
+	public PropertyMapping[] map(String propertySourceName) {
+		return this.fromSource.getOrDefault(propertySourceName, Collections.emptyList())
+				.toArray(new PropertyMapping[0]);
 	}
 
 	@Override
-	public List<PropertyMapping> map(PropertySource<?> propertySource,
-			String propertySourceName) {
-		return this.fromSource.getOrDefault(propertySourceName, Collections.emptyList());
-	}
-
-	@Override
-	public List<PropertyMapping> map(PropertySource<?> propertySource,
-			ConfigurationPropertyName configurationPropertyName) {
-		return this.fromConfig.getOrDefault(configurationPropertyName,
-				Collections.emptyList());
+	public PropertyMapping[] map(ConfigurationPropertyName configurationPropertyName) {
+		return this.fromConfig
+				.getOrDefault(configurationPropertyName, Collections.emptyList())
+				.toArray(new PropertyMapping[0]);
 	}
 
 }

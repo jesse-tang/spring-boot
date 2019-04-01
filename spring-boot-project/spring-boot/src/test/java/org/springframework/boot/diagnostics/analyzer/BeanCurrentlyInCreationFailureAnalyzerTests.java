@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,8 +19,8 @@ package org.springframework.boot.diagnostics.analyzer;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.StringReader;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.junit.Test;
 
@@ -125,14 +125,9 @@ public class BeanCurrentlyInCreationFailureAnalyzerTests {
 
 	private List<String> readDescriptionLines(FailureAnalysis analysis)
 			throws IOException {
-		try (BufferedReader lineReader = new BufferedReader(
+		try (BufferedReader reader = new BufferedReader(
 				new StringReader(analysis.getDescription()))) {
-			List<String> lines = new ArrayList<>();
-			String line;
-			while ((line = lineReader.readLine()) != null) {
-				lines.add(line);
-			}
-			return lines;
+			return reader.lines().collect(Collectors.toList());
 		}
 	}
 
@@ -149,12 +144,11 @@ public class BeanCurrentlyInCreationFailureAnalyzerTests {
 			return null;
 		}
 		catch (Exception ex) {
-			ex.printStackTrace();
 			return ex;
 		}
 	}
 
-	@org.springframework.context.annotation.Configuration
+	@org.springframework.context.annotation.Configuration(proxyBeanMethods = false)
 	static class CyclicBeanMethodsConfiguration {
 
 		@Bean
@@ -162,7 +156,7 @@ public class BeanCurrentlyInCreationFailureAnalyzerTests {
 			return new BeanThree();
 		}
 
-		@org.springframework.context.annotation.Configuration
+		@org.springframework.context.annotation.Configuration(proxyBeanMethods = false)
 		static class InnerConfiguration {
 
 			@Bean
@@ -170,7 +164,7 @@ public class BeanCurrentlyInCreationFailureAnalyzerTests {
 				return new BeanTwo();
 			}
 
-			@Configuration
+			@Configuration(proxyBeanMethods = false)
 			static class InnerInnerConfiguration {
 
 				@Bean
@@ -184,7 +178,7 @@ public class BeanCurrentlyInCreationFailureAnalyzerTests {
 
 	}
 
-	@Configuration
+	@Configuration(proxyBeanMethods = false)
 	static class CycleReferencedViaOtherBeansConfiguration {
 
 		@Bean
@@ -202,7 +196,7 @@ public class BeanCurrentlyInCreationFailureAnalyzerTests {
 			return new BeanThree();
 		}
 
-		@Configuration
+		@Configuration(proxyBeanMethods = false)
 		static class InnerConfiguration {
 
 			@Bean
@@ -210,7 +204,7 @@ public class BeanCurrentlyInCreationFailureAnalyzerTests {
 				return new RefererTwo();
 			}
 
-			@Configuration
+			@Configuration(proxyBeanMethods = false)
 			static class InnerInnerConfiguration {
 
 				@Bean
@@ -224,7 +218,7 @@ public class BeanCurrentlyInCreationFailureAnalyzerTests {
 
 	}
 
-	@org.springframework.context.annotation.Configuration
+	@org.springframework.context.annotation.Configuration(proxyBeanMethods = false)
 	public static class CycleWithAutowiredFields {
 
 		@Bean
@@ -232,6 +226,7 @@ public class BeanCurrentlyInCreationFailureAnalyzerTests {
 			return new BeanOne();
 		}
 
+		@org.springframework.context.annotation.Configuration(proxyBeanMethods = false)
 		public static class BeanTwoConfiguration {
 
 			@SuppressWarnings("unused")
@@ -245,6 +240,7 @@ public class BeanCurrentlyInCreationFailureAnalyzerTests {
 
 		}
 
+		@org.springframework.context.annotation.Configuration(proxyBeanMethods = false)
 		public static class BeanThreeConfiguration {
 
 			@Bean

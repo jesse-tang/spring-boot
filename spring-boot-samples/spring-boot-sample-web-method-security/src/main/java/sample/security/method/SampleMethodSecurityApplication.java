@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,7 +19,7 @@ package sample.security.method;
 import java.util.Date;
 import java.util.Map;
 
-import org.springframework.boot.actuate.autoconfigure.security.EndpointRequest;
+import org.springframework.boot.actuate.autoconfigure.security.servlet.EndpointRequest;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.context.annotation.Bean;
@@ -42,34 +42,21 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 @EnableGlobalMethodSecurity(securedEnabled = true)
 public class SampleMethodSecurityApplication implements WebMvcConfigurer {
 
-	@Controller
-	protected static class HomeController {
-
-		@GetMapping("/")
-		@Secured("ROLE_ADMIN")
-		public String home(Map<String, Object> model) {
-			model.put("message", "Hello World");
-			model.put("title", "Hello Home");
-			model.put("date", new Date());
-			return "home";
-		}
-
-	}
-
 	@Override
 	public void addViewControllers(ViewControllerRegistry registry) {
 		registry.addViewController("/login").setViewName("login");
 		registry.addViewController("/access").setViewName("access");
 	}
 
-	public static void main(String[] args) throws Exception {
+	public static void main(String[] args) {
 		new SpringApplicationBuilder(SampleMethodSecurityApplication.class).run(args);
 	}
 
 	@Order(Ordered.HIGHEST_PRECEDENCE)
-	@Configuration
+	@Configuration(proxyBeanMethods = false)
 	protected static class AuthenticationSecurity {
 
+		@SuppressWarnings("deprecation")
 		@Bean
 		public InMemoryUserDetailsManager inMemoryUserDetailsManager() throws Exception {
 			return new InMemoryUserDetailsManager(
@@ -81,7 +68,7 @@ public class SampleMethodSecurityApplication implements WebMvcConfigurer {
 
 	}
 
-	@Configuration
+	@Configuration(proxyBeanMethods = false)
 	protected static class ApplicationSecurity extends WebSecurityConfigurerAdapter {
 
 		@Override
@@ -101,7 +88,7 @@ public class SampleMethodSecurityApplication implements WebMvcConfigurer {
 
 	}
 
-	@Configuration
+	@Configuration(proxyBeanMethods = false)
 	@Order(1)
 	protected static class ActuatorSecurity extends WebSecurityConfigurerAdapter {
 
@@ -113,6 +100,20 @@ public class SampleMethodSecurityApplication implements WebMvcConfigurer {
 					.and()
 				.httpBasic();
 			// @formatter:on
+		}
+
+	}
+
+	@Controller
+	protected static class HomeController {
+
+		@GetMapping("/")
+		@Secured("ROLE_ADMIN")
+		public String home(Map<String, Object> model) {
+			model.put("message", "Hello World");
+			model.put("title", "Hello Home");
+			model.put("date", new Date());
+			return "home";
 		}
 
 	}

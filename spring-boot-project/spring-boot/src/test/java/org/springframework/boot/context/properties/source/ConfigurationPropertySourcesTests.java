@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -54,6 +54,18 @@ public class ConfigurationPropertySourcesTests {
 		assertThat(sources.size()).isEqualTo(size + 1);
 		PropertyResolver resolver = new PropertySourcesPropertyResolver(sources);
 		assertThat(resolver.getProperty("server.port")).isEqualTo("1234");
+	}
+
+	@Test
+	public void attachShouldReAttachInMergedSetup() {
+		ConfigurableEnvironment parent = new StandardEnvironment();
+		ConfigurationPropertySources.attach(parent);
+		ConfigurableEnvironment child = new StandardEnvironment();
+		child.merge(parent);
+		child.getPropertySources().addLast(new MapPropertySource("config",
+				Collections.singletonMap("my.example_property", "1234")));
+		ConfigurationPropertySources.attach(child);
+		assertThat(child.getProperty("my.example-property")).isEqualTo("1234");
 	}
 
 	@Test
@@ -115,7 +127,7 @@ public class ConfigurationPropertySourcesTests {
 				new MapPropertySource("baz", Collections.singletonMap("baz", "barf")));
 		Iterable<ConfigurationPropertySource> configurationSources = ConfigurationPropertySources
 				.from(sources);
-		assertThat(configurationSources.iterator()).hasSize(5);
+		assertThat(configurationSources.iterator()).toIterable().hasSize(5);
 	}
 
 }

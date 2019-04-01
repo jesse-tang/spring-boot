@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -15,8 +15,6 @@
  */
 
 package org.springframework.boot.context.properties.source;
-
-import java.util.function.Function;
 
 import org.springframework.core.env.PropertySource;
 
@@ -34,8 +32,6 @@ class PropertyMapping {
 
 	private final ConfigurationPropertyName configurationPropertyName;
 
-	private final Function<Object, Object> valueExtractor;
-
 	/**
 	 * Create a new {@link PropertyMapper} instance.
 	 * @param propertySourceName the {@link PropertySource} name
@@ -44,22 +40,8 @@ class PropertyMapping {
 	 */
 	PropertyMapping(String propertySourceName,
 			ConfigurationPropertyName configurationPropertyName) {
-		this(propertySourceName, configurationPropertyName, Function.identity());
-	}
-
-	/**
-	 * Create a new {@link PropertyMapper} instance.
-	 * @param propertySourceName the {@link PropertySource} name
-	 * @param configurationPropertyName the {@link ConfigurationPropertySource}
-	 * {@link ConfigurationPropertyName}
-	 * @param valueExtractor the extractor used to obtain the value
-	 */
-	PropertyMapping(String propertySourceName,
-			ConfigurationPropertyName configurationPropertyName,
-			Function<Object, Object> valueExtractor) {
 		this.propertySourceName = propertySourceName;
 		this.configurationPropertyName = configurationPropertyName;
-		this.valueExtractor = valueExtractor;
 	}
 
 	/**
@@ -79,14 +61,6 @@ class PropertyMapping {
 	public ConfigurationPropertyName getConfigurationPropertyName() {
 		return this.configurationPropertyName;
 
-	}
-
-	/**
-	 * Return a function that can be used to extract the {@link PropertySource} value.
-	 * @return the value extractor (never {@code null})
-	 */
-	public Function<Object, Object> getValueExtractor() {
-		return this.valueExtractor;
 	}
 
 	/**

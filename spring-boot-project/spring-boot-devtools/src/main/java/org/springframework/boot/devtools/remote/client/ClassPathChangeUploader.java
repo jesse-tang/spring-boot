@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -19,13 +19,13 @@ package org.springframework.boot.devtools.remote.client;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.ObjectOutputStream;
-import java.net.ConnectException;
 import java.net.MalformedURLException;
+import java.net.SocketException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.Collections;
-import java.util.HashMap;
+import java.util.EnumMap;
 import java.util.Map;
 
 import org.apache.commons.logging.Log;
@@ -61,7 +61,8 @@ public class ClassPathChangeUploader
 	private static final Map<ChangedFile.Type, ClassLoaderFile.Kind> TYPE_MAPPINGS;
 
 	static {
-		Map<ChangedFile.Type, ClassLoaderFile.Kind> map = new HashMap<>();
+		Map<ChangedFile.Type, ClassLoaderFile.Kind> map = new EnumMap<>(
+				ChangedFile.Type.class);
 		map.put(ChangedFile.Type.ADD, ClassLoaderFile.Kind.ADDED);
 		map.put(ChangedFile.Type.DELETE, ClassLoaderFile.Kind.DELETED);
 		map.put(ChangedFile.Type.MODIFY, ClassLoaderFile.Kind.MODIFIED);
@@ -110,15 +111,16 @@ public class ClassPathChangeUploader
 					headers.setContentLength(bytes.length);
 					FileCopyUtils.copy(bytes, request.getBody());
 					ClientHttpResponse response = request.execute();
-					Assert.state(response.getStatusCode() == HttpStatus.OK,
-							"Unexpected " + response.getStatusCode()
-									+ " response uploading class files");
+					HttpStatus statusCode = response.getStatusCode();
+					Assert.state(statusCode == HttpStatus.OK, () -> "Unexpected "
+							+ statusCode + " response uploading class files");
 					logUpload(classLoaderFiles);
 					return;
 				}
-				catch (ConnectException ex) {
-					logger.warn("Failed to connect when uploading to " + this.uri
+				catch (SocketException ex) {
+					logger.warn("A failure occurred when uploading to " + this.uri
 							+ ". Upload will be retried in 2 seconds");
+					logger.debug("Upload failure", ex);
 					Thread.sleep(2000);
 				}
 			}
@@ -131,8 +133,8 @@ public class ClassPathChangeUploader
 
 	private void logUpload(ClassLoaderFiles classLoaderFiles) {
 		int size = classLoaderFiles.size();
-		logger.info(
-				"Uploaded " + size + " class " + (size == 1 ? "resource" : "resources"));
+		logger.info("Uploaded " + size + " class "
+				+ ((size != 1) ? "resources" : "resource"));
 	}
 
 	private byte[] serialize(ClassLoaderFiles classLoaderFiles) throws IOException {
@@ -159,10 +161,10 @@ public class ClassPathChangeUploader
 	private ClassLoaderFile asClassLoaderFile(ChangedFile changedFile)
 			throws IOException {
 		ClassLoaderFile.Kind kind = TYPE_MAPPINGS.get(changedFile.getType());
-		byte[] bytes = (kind == Kind.DELETED ? null
-				: FileCopyUtils.copyToByteArray(changedFile.getFile()));
-		long lastModified = (kind == Kind.DELETED ? System.currentTimeMillis()
-				: changedFile.getFile().lastModified());
+		byte[] bytes = (kind != Kind.DELETED)
+				? FileCopyUtils.copyToByteArray(changedFile.getFile()) : null;
+		long lastModified = (kind != Kind.DELETED) ? changedFile.getFile().lastModified()
+				: System.currentTimeMillis();
 		return new ClassLoaderFile(kind, lastModified, bytes);
 	}
 

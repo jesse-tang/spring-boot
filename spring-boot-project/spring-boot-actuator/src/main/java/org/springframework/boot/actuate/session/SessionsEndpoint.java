@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2018 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,6 +16,7 @@
 
 package org.springframework.boot.actuate.session;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -51,9 +52,7 @@ public class SessionsEndpoint {
 	@ReadOperation
 	public SessionsReport sessionsForUsername(String username) {
 		Map<String, ? extends Session> sessions = this.sessionRepository
-				.findByIndexNameAndIndexValue(
-						FindByIndexNameSessionRepository.PRINCIPAL_NAME_INDEX_NAME,
-						username);
+				.findByPrincipalName(username);
 		return new SessionsReport(sessions);
 	}
 
@@ -80,8 +79,7 @@ public class SessionsEndpoint {
 		private final List<SessionDescriptor> sessions;
 
 		public SessionsReport(Map<String, ? extends Session> sessions) {
-			this.sessions = sessions.entrySet().stream()
-					.map((s) -> new SessionDescriptor(s.getValue()))
+			this.sessions = sessions.values().stream().map(SessionDescriptor::new)
 					.collect(Collectors.toList());
 		}
 
@@ -101,9 +99,9 @@ public class SessionsEndpoint {
 
 		private final Set<String> attributeNames;
 
-		private final long creationTime;
+		private final Instant creationTime;
 
-		private final long lastAccessedTime;
+		private final Instant lastAccessedTime;
 
 		private final long maxInactiveInterval;
 
@@ -112,8 +110,8 @@ public class SessionsEndpoint {
 		public SessionDescriptor(Session session) {
 			this.id = session.getId();
 			this.attributeNames = session.getAttributeNames();
-			this.creationTime = session.getCreationTime().toEpochMilli();
-			this.lastAccessedTime = session.getLastAccessedTime().toEpochMilli();
+			this.creationTime = session.getCreationTime();
+			this.lastAccessedTime = session.getLastAccessedTime();
 			this.maxInactiveInterval = session.getMaxInactiveInterval().getSeconds();
 			this.expired = session.isExpired();
 		}
@@ -126,11 +124,11 @@ public class SessionsEndpoint {
 			return this.attributeNames;
 		}
 
-		public long getCreationTime() {
+		public Instant getCreationTime() {
 			return this.creationTime;
 		}
 
-		public long getLastAccessedTime() {
+		public Instant getLastAccessedTime() {
 			return this.lastAccessedTime;
 		}
 

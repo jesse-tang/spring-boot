@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,28 +16,39 @@
 
 package org.springframework.boot.autoconfigure.web.reactive.error;
 
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
+import org.apache.commons.logging.Log;
 import reactor.core.publisher.Mono;
 
 import org.springframework.beans.factory.InitializingBean;
 import org.springframework.boot.autoconfigure.template.TemplateAvailabilityProviders;
 import org.springframework.boot.autoconfigure.web.ResourceProperties;
+import org.springframework.boot.web.reactive.error.ErrorAttributes;
+import org.springframework.boot.web.reactive.error.ErrorWebExceptionHandler;
 import org.springframework.context.ApplicationContext;
+import org.springframework.core.NestedExceptionUtils;
 import org.springframework.core.io.Resource;
+import org.springframework.http.HttpLogging;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.codec.HttpMessageReader;
 import org.springframework.http.codec.HttpMessageWriter;
 import org.springframework.util.Assert;
 import org.springframework.util.CollectionUtils;
+import org.springframework.util.StringUtils;
 import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.server.RouterFunction;
 import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
 import org.springframework.web.reactive.result.view.ViewResolver;
 import org.springframework.web.server.ServerWebExchange;
+import org.springframework.web.util.HtmlUtils;
 
 /**
  * Abstract base class for {@link ErrorWebExceptionHandler} implementations.
@@ -48,6 +59,15 @@ import org.springframework.web.server.ServerWebExchange;
  */
 public abstract class AbstractErrorWebExceptionHandler
 		implements ErrorWebExceptionHandler, InitializingBean {
+
+	/**
+	 * Currently duplicated from Spring WebFlux HttpWebHandlerAdapter.
+	 */
+	private static final Set<String> DISCONNECTED_CLIENT_EXCEPTIONS = new HashSet<>(
+			Arrays.asList("ClientAbortException", "EOFException", "EofException"));
+
+	private static final Log logger = HttpLogging
+			.forLogName(AbstractErrorWebExceptionHandler.class);
 
 	private final ApplicationContext applicationContext;
 
@@ -187,14 +207,27 @@ public abstract class AbstractErrorWebExceptionHandler
 			ServerResponse.BodyBuilder responseBody, Map<String, Object> error) {
 		StringBuilder builder = new StringBuilder();
 		Date timestamp = (Date) error.get("timestamp");
-		builder.append("<html><body><h1>Whitelabel Error Page</h1>")
-				.append("<p>This application has no configured error view, so you are seeing this as a fallback.</p>")
-				.append("<div id='created'>").append(timestamp.toString())
-				.append("</div>").append("<div>There was an unexpected error (type=")
-				.append(error.get("error")).append(", status=")
-				.append(error.get("status")).append(").</div>").append("<div>")
-				.append(error.get("message")).append("</div>").append("</body></html>");
+		Object message = error.get("message");
+		Object trace = error.get("trace");
+		builder.append("<html><body><h1>Whitelabel Error Page</h1>").append(
+				"<p>This application has no configured error view, so you are seeing this as a fallback.</p>")
+				.append("<div id='created'>").append(timestamp).append("</div>")
+				.append("<div>There was an unexpected error (type=")
+				.append(htmlEscape(error.get("error"))).append(", status=")
+				.append(htmlEscape(error.get("status"))).append(").</div>");
+		if (message != null) {
+			builder.append("<div>").append(htmlEscape(message)).append("</div>");
+		}
+		if (trace != null) {
+			builder.append("<div style='white-space:pre-wrap;'>")
+					.append(htmlEscape(trace)).append("</div>");
+		}
+		builder.append("</body></html>");
 		return responseBody.syncBody(builder.toString());
+	}
+
+	private String htmlEscape(Object input) {
+		return (input != null) ? HtmlUtils.htmlEscape(input.toString()) : null;
 	}
 
 	@Override
@@ -220,7 +253,8 @@ public abstract class AbstractErrorWebExceptionHandler
 
 	@Override
 	public Mono<Void> handle(ServerWebExchange exchange, Throwable throwable) {
-		if (exchange.getResponse().isCommitted()) {
+		if (exchange.getResponse().isCommitted()
+				|| isDisconnectedClientError(throwable)) {
 			return Mono.error(throwable);
 		}
 		this.errorAttributes.storeErrorInformation(throwable, exchange);
@@ -228,7 +262,40 @@ public abstract class AbstractErrorWebExceptionHandler
 		return getRoutingFunction(this.errorAttributes).route(request)
 				.switchIfEmpty(Mono.error(throwable))
 				.flatMap((handler) -> handler.handle(request))
+				.doOnNext((response) -> logError(request, response, throwable))
 				.flatMap((response) -> write(exchange, response));
+	}
+
+	private boolean isDisconnectedClientError(Throwable ex) {
+		String message = NestedExceptionUtils.getMostSpecificCause(ex).getMessage();
+		if (message != null && message.toLowerCase().contains("broken pipe")) {
+			return true;
+		}
+		return DISCONNECTED_CLIENT_EXCEPTIONS.contains(ex.getClass().getSimpleName());
+	}
+
+	private void logError(ServerRequest request, ServerResponse response,
+			Throwable throwable) {
+		if (logger.isDebugEnabled()) {
+			logger.debug(
+					request.exchange().getLogPrefix() + formatError(throwable, request));
+		}
+		if (response.statusCode().equals(HttpStatus.INTERNAL_SERVER_ERROR)) {
+			logger.error(request.exchange().getLogPrefix() + "500 Server Error for "
+					+ formatRequest(request), throwable);
+		}
+	}
+
+	private String formatError(Throwable ex, ServerRequest request) {
+		String reason = ex.getClass().getSimpleName() + ": " + ex.getMessage();
+		return "Resolved [" + reason + "] for HTTP " + request.methodName() + " "
+				+ request.path();
+	}
+
+	private String formatRequest(ServerRequest request) {
+		String rawQuery = request.uri().getRawQuery();
+		String query = StringUtils.hasText(rawQuery) ? "?" + rawQuery : "";
+		return "HTTP " + request.methodName() + " \"" + request.path() + query + "\"";
 	}
 
 	private Mono<? extends Void> write(ServerWebExchange exchange,

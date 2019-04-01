@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2019 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,7 +17,8 @@
 package org.springframework.boot.autoconfigure.data.redis;
 
 import org.junit.After;
-import org.junit.Rule;
+import org.junit.Before;
+import org.junit.ClassRule;
 import org.junit.Test;
 
 import org.springframework.boot.autoconfigure.TestAutoConfigurationPackage;
@@ -26,7 +27,8 @@ import org.springframework.boot.autoconfigure.data.alt.redis.CityRedisRepository
 import org.springframework.boot.autoconfigure.data.empty.EmptyDataPackage;
 import org.springframework.boot.autoconfigure.data.redis.city.City;
 import org.springframework.boot.autoconfigure.data.redis.city.CityRepository;
-import org.springframework.boot.testsupport.rule.RedisTestServer;
+import org.springframework.boot.test.util.TestPropertyValues;
+import org.springframework.boot.testsupport.testcontainers.RedisContainer;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.repository.configuration.EnableRedisRepositories;
@@ -40,10 +42,16 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 public class RedisRepositoriesAutoConfigurationTests {
 
-	@Rule
-	public RedisTestServer redis = new RedisTestServer();
+	@ClassRule
+	public static RedisContainer redis = new RedisContainer();
 
 	private AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext();
+
+	@Before
+	public void setUp() {
+		TestPropertyValues.of("spring.redis.port=" + redis.getMappedPort())
+				.applyTo(this.context.getEnvironment());
+	}
 
 	@After
 	public void close() {
@@ -77,19 +85,19 @@ public class RedisRepositoriesAutoConfigurationTests {
 		assertThat(this.context.getBean(CityRedisRepository.class)).isNotNull();
 	}
 
-	@Configuration
+	@Configuration(proxyBeanMethods = false)
 	@TestAutoConfigurationPackage(City.class)
 	protected static class TestConfiguration {
 
 	}
 
-	@Configuration
+	@Configuration(proxyBeanMethods = false)
 	@TestAutoConfigurationPackage(EmptyDataPackage.class)
 	protected static class EmptyConfiguration {
 
 	}
 
-	@Configuration
+	@Configuration(proxyBeanMethods = false)
 	@TestAutoConfigurationPackage(RedisRepositoriesAutoConfigurationTests.class)
 	@EnableRedisRepositories(basePackageClasses = CityRedisRepository.class)
 	static class CustomizedConfiguration {

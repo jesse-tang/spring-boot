@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2018 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -17,7 +17,6 @@
 package org.springframework.boot.test.web.htmlunit;
 
 import java.io.IOException;
-import java.net.MalformedURLException;
 import java.net.URL;
 
 import com.gargoylesoftware.htmlunit.StringWebResponse;
@@ -25,9 +24,7 @@ import com.gargoylesoftware.htmlunit.WebClient;
 import com.gargoylesoftware.htmlunit.WebConnection;
 import com.gargoylesoftware.htmlunit.WebRequest;
 import com.gargoylesoftware.htmlunit.WebResponse;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.ExpectedException;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Captor;
 import org.mockito.MockitoAnnotations;
@@ -35,6 +32,7 @@ import org.mockito.MockitoAnnotations;
 import org.springframework.mock.env.MockEnvironment;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
@@ -48,9 +46,6 @@ import static org.mockito.Mockito.verify;
 @SuppressWarnings("resource")
 public class LocalHostWebClientTests {
 
-	@Rule
-	public ExpectedException thrown = ExpectedException.none();
-
 	@Captor
 	private ArgumentCaptor<WebRequest> requestCaptor;
 
@@ -60,9 +55,9 @@ public class LocalHostWebClientTests {
 
 	@Test
 	public void createWhenEnvironmentIsNullWillThrowException() {
-		this.thrown.expect(IllegalArgumentException.class);
-		this.thrown.expectMessage("Environment must not be null");
-		new LocalHostWebClient(null);
+		assertThatIllegalArgumentException()
+				.isThrownBy(() -> new LocalHostWebClient(null))
+				.withMessageContaining("Environment must not be null");
 	}
 
 	@Test
@@ -91,10 +86,10 @@ public class LocalHostWebClientTests {
 				.isEqualTo(new URL("http://localhost:8181/test"));
 	}
 
-	private WebConnection mockConnection() throws MalformedURLException, IOException {
+	private WebConnection mockConnection() throws IOException {
 		WebConnection connection = mock(WebConnection.class);
 		WebResponse response = new StringWebResponse("test", new URL("http://localhost"));
-		given(connection.getResponse((WebRequest) any())).willReturn(response);
+		given(connection.getResponse(any())).willReturn(response);
 		return connection;
 	}
 

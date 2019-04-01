@@ -1,11 +1,11 @@
 /*
- * Copyright 2012-2017 the original author or authors.
+ * Copyright 2012-2018 the original author or authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *      http://www.apache.org/licenses/LICENSE-2.0
+ *      https://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -18,7 +18,9 @@ package org.springframework.boot.cli;
 
 import java.io.IOException;
 
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 
 import org.springframework.boot.cli.infrastructure.CommandLineInvoker;
 import org.springframework.boot.cli.infrastructure.CommandLineInvoker.Invocation;
@@ -36,7 +38,10 @@ import static org.junit.Assert.assertThat;
  */
 public class CommandLineIT {
 
-	private final CommandLineInvoker cli = new CommandLineInvoker();
+	@Rule
+	public final TemporaryFolder temp = new TemporaryFolder();
+
+	private final CommandLineInvoker cli = new CommandLineInvoker(this.temp);
 
 	@Test
 	public void hintProducesListOfValidCommands()
@@ -45,7 +50,7 @@ public class CommandLineIT {
 		assertThat(cli.await(), equalTo(0));
 		assertThat("Unexpected error: \n" + cli.getErrorOutput(),
 				cli.getErrorOutput().length(), equalTo(0));
-		assertThat(cli.getStandardOutputLines().size(), equalTo(10));
+		assertThat(cli.getStandardOutputLines().size(), equalTo(11));
 	}
 
 	@Test
